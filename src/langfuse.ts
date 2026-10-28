@@ -258,7 +258,40 @@ function wrapObservation(
   };
 }
 
+// Langfuse v4 serves new data through the v2 observations API; its legacy trace API reads the old tables, which lag
+// behind OTel ingestion and are removed once a v4 deployment leaves the dual write mode. Langfuse v3 has only the legacy
+// trace API. The server's major version, from its health endpoint, picks the API once per runtime; when it cannot be
+// read, the legacy API is used, which is how v3 behaves.
+function visibilityApi(rt: LangfuseRuntime): Promise<"v2" | "legacy"> {
+  rt.visibilityApi ??= (async () => {
+    const api = rt.scoreClient.api;
+    if (!api?.observations?.getMany || !api.health?.health) {
+      return "legacy";
+    }
+    try {
+      const health = await withTimeout("Langfuse version check", api.health.health());
+      const major = Number.parseInt(health?.version?.split(".")[0] ?? "", 10);
+      return major >= 4 ? "v2" : "legacy";
+    } catch {
+      return "legacy";
+    }
+  })();
+  return rt.visibilityApi;
+}
+
 async function traceExists(rt: LangfuseRuntime, traceId: string): Promise<boolean> {
+  if ((await visibilityApi(rt)) === "v2") {
+    try {
+      const page = await withTimeout(
+        "Trace visibility check",
+        rt.scoreClient.api?.observations?.getMany?.({ traceId, limit: 1, fields: "core" }),
+      );
+      return (page?.data?.length ?? 0) > 0;
+    } catch {
+      return false;
+    }
+  }
+
   try {
     const traceApi = rt.scoreClient.api?.trace;
     if (!traceApi?.get) {

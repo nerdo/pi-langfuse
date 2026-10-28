@@ -38,6 +38,12 @@ export interface ObservationUpdate {
 
 export interface LangfuseScoreClient {
   api?: {
+    health?: {
+      health?: () => Promise<{ version?: string } | undefined>;
+    };
+    observations?: {
+      getMany?: (request: { traceId?: string; limit?: number; fields?: string }) => Promise<{ data?: unknown[] } | undefined>;
+    };
     trace?: {
       get?: (traceId: string) => Promise<unknown>;
     };
@@ -79,6 +85,8 @@ export interface LangfuseRuntime {
   tracerProvider?: { forceFlush?: () => Promise<void>; shutdown?: () => Promise<void> };
   clearTracerProvider?: () => void;
   restFallback?: unknown;
+  /** Which API answers "is this trace visible yet": v2 observations on Langfuse v4+, the legacy trace API before. */
+  visibilityApi?: Promise<"v2" | "legacy">;
 }
 
 export interface GenerationState {

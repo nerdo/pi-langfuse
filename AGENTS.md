@@ -84,6 +84,9 @@ Relevant implementation details:
 - The runtime is created lazily in `src/langfuse.ts`.
 - OpenTelemetry export is the primary path.
 - If OTel accepts spans but the trace never becomes visible, the extension falls back to Langfuse REST ingestion.
+- Visibility is checked with the API the server supports, chosen once per runtime from `GET /api/public/health`:
+  Langfuse v4+ through `GET /api/public/v2/observations?traceId=` (the legacy trace API reads the old tables, which
+  lag behind OTel and go away after the v4 cutover), v3 or an unreadable version through the legacy `api.trace.get`.
 - Scores are sent separately through the Langfuse client; they are not part of the OTel span export path.
 - Root trace IO is mirrored from the root agent observation when `setTraceIO()` is available.
 
